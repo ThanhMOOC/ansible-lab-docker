@@ -10,6 +10,7 @@ services:
     hostname: node1
     ports:
       - "2221:22"
+      - "8081:8081"
     networks:
       - ansible-net
 
@@ -22,6 +23,7 @@ services:
     hostname: node2
     ports:
       - "2222:22"
+      - "8082:8082"
     networks:
       - ansible-net
 
@@ -38,7 +40,7 @@ services:
       - node1
       - node2
     volumes:
-      - ./shared_folder:/etc/ansible
+      - ./ansible-server/shared_folder:/etc/ansible
     networks:
       - ansible-net
     stdin_open: true

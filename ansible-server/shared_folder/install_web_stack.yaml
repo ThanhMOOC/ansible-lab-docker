@@ -6,15 +6,6 @@
   become_method: su
 
   tasks:
-    - name: Ensure /tmp/.ansible/tmp exists and is writable
-      file:
-        path: /tmp/.ansible/tmp
-        state: directory
-        mode: '1777'
-        owner: root
-        group: root
-      become: yes
-      become_method: su
     - name: Update APT & Install Tools
       apt:
         update_cache: yes
@@ -34,46 +25,142 @@
           - php-mysql
         state: present
 
-
-    - name: Configure Apache2 to listen on port 8081
+    - name: Configure Apache2 to listen on port 8081 (node1)
       lineinfile:
         path: /etc/apache2/ports.conf
         regexp: '^Listen '
         line: 'Listen 8081'
         backup: yes
+      when: inventory_hostname == 'node1'
 
-    - name: Replace Apache2 default site with port 8081 config
+    - name: Update Apache2 default site to use port 8081 (node1)
+      lineinfile:
+        path: /etc/apache2/sites-available/000-default.conf
+        regexp: '<VirtualHost *:80>'
+        line: '<VirtualHost *:8081>'
+        backup: yes
+      notify: restart apache2
+      when: inventory_hostname == 'node1'
+
+    - name: Configure Apache2 to listen on port 8082 (node2)
+      lineinfile:
+        path: /etc/apache2/ports.conf
+        regexp: '^Listen '
+        line: 'Listen 8082'
+        backup: yes
+      when: inventory_hostname == 'node2'
+
+    - name: Overwrite Apache2 default site config for node2 (8082)
       copy:
         dest: /etc/apache2/sites-available/000-default.conf
         content: |
-          <VirtualHost *:8081>
+          <VirtualHost *:8082>
               ServerAdmin webmaster@localhost
               DocumentRoot /var/www/html
+              ServerName node2
               ErrorLog ${APACHE_LOG_DIR}/error.log
               CustomLog ${APACHE_LOG_DIR}/access.log combined
-              #Include conf-available/serve-cgi-bin.conf
           </VirtualHost>
-        owner: root
-        group: root
-        mode: '0644'
+        backup: yes
       notify: restart apache2
+      when: inventory_hostname == 'node2'
 
-    - name: Create info.php
+- name: Install Web Stack
+  hosts: webservers-nodes
+  gather_facts: false
+  become: yes
+  become_method: su
+
+  tasks:
+    - name: Update APT and install tools
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+        name:
+          - procps
+          - net-tools
+        state: present
+
+    - name: Install Apache2, PHP, and MySQL
+      apt:
+        name:
+          - apache2
+          - php
+          - libapache2-mod-php
+          - mysql-server
+          - php-mysql
+        state: present
+
+    - name: Configure Apache2 to listen on port 8081 (node1)
+      lineinfile:
+        path: /etc/apache2/ports.conf
+        regexp: '^Listen '
+        line: 'Listen 8081'
+        backup: yes
+      when: inventory_hostname == 'node1'
+
+    - name: Update Apache2 default site to use port 8081 (node1)
+      lineinfile:
+        path: /etc/apache2/sites-available/000-default.conf
+        regexp: '<VirtualHost *:80>'
+        line: '<VirtualHost *:8081>'
+        backup: yes
+      notify: restart apache2
+      when: inventory_hostname == 'node1'
+
+    - name: Configure Apache2 to listen on port 8082 (node2)
+      lineinfile:
+        path: /etc/apache2/ports.conf
+        regexp: '^Listen '
+        line: 'Listen 8082'
+        backup: yes
+      when: inventory_hostname == 'node2'
+
+    - name: Overwrite Apache2 default site config for node2 (8082)
+      copy:
+        dest: /etc/apache2/sites-available/000-default.conf
+        content: |
+          <VirtualHost *:8082>
+              ServerAdmin webmaster@localhost
+              DocumentRoot /var/www/html
+              ServerName node2
+              ErrorLog ${APACHE_LOG_DIR}/error.log
+              CustomLog ${APACHE_LOG_DIR}/access.log combined
+          </VirtualHost>
+        backup: yes
+      notify: restart apache2
+      when: inventory_hostname == 'node2'
+
+    - name: Create info.php file
       copy:
         content: "<?php phpinfo(); ?>"
         dest: /var/www/html/info.php
 
-    - name: Start and enable MySQL
+    - name: Start and enable MySQL service
       service:
         name: mysql
         state: started
         enabled: yes
 
-    - name: Start and enable Apache2
+    - name: Start and enable Apache2 service
       service:
         name: apache2
         state: started
         enabled: yes
+
+    - name: Check Apache2 status
+      shell: service apache2 status | grep -q 'running'
+      register: apache_status
+      changed_when: false
+      failed_when: apache_status.rc != 0
+      ignore_errors: false
+
+    - name: Check MySQL status
+      shell: pgrep mysqld
+      register: mysql_status
+      changed_when: false
+      failed_when: mysql_status.rc != 0
+      ignore_errors: false
 
     - name: Verify Apache2 is listening on port 8081
       shell: netstat -tlnp 2>/dev/null | grep -q ":8081.*apache2" || ss -tlnp 2>/dev/null | grep -q ":8081.*apache2"
@@ -81,9 +168,31 @@
       changed_when: false
       failed_when: false
 
-    - name: Display Apache2 port status
+    - name: Show Apache2 port status
       debug:
         msg: "Apache2 is {{ 'listening on port 8081' if apache_port_check.rc == 0 else 'NOT listening on port 8081 - check configuration' }}"
+
+    - name: Remove old Apache2 config backups
+      file:
+        path: /etc/apache2/ports.conf.bak
+        state: absent
+      ignore_errors: true
+
+    - name: Remove old site config backups
+      file:
+        path: /etc/apache2/sites-available/000-default.conf.bak
+        state: absent
+      ignore_errors: true
+
+    - name: Remove other .bak files in Apache2 config
+      shell: find /etc/apache2 -name '*.bak' -delete
+      changed_when: false
+      ignore_errors: true
+
+    - name: Remove other .bak files in web root
+      shell: find /var/www/html -name '*.bak' -delete
+      changed_when: false
+      ignore_errors: true
 
   handlers:
     - name: restart apache2

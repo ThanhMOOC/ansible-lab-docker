@@ -19,6 +19,7 @@ echo "=== Testing sshd configuration ==="
 # "=== Generating SSH client key (non-interactive) ==="
 mkdir -p /root/.ssh
 chmod 700 /root/.ssh
+
 ssh-keygen -t ed25519 -f /root/.ssh/id_ed25519 -N "" -q
 
 #echo "=== Starting SSH daemon in background ==="

@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 # Setup script for Ansible-lab-Docker: build, run containers, and execute Ansible playbook
 set -e
 
@@ -29,8 +30,8 @@ docker compose up -d --build
 echo "Waiting for containers to be ready..."
 sleep 5
 
-# Run Ansible playbook from host (using docker connection)
-echo "Running Ansible playbook..."
-ansible-playbook -i shared_folder/hosts.ini shared_folder/install_web_stack.yaml
+# Run Ansible playbook from ansible-server container (recommended)
+echo "Running Ansible playbook inside ansible-server container..."
+docker compose exec ansible-server ansible-playbook /etc/ansible/install_web_stack.yaml -i /etc/ansible/hosts.ini
 
-echo "\nSetup completed!"
+echo "Cleanup completed! All containers and configs are up to date."
