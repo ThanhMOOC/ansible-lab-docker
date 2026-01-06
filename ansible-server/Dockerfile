@@ -13,7 +13,6 @@ RUN apt-get update && \
     vim \
     procps \
     ansible \
-    docker.io \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
