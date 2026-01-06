@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  node1:
+    build:
+      context: ./node1
+      dockerfile: Dockerfile
+    image: ansible-node1:latest
+    container_name: node1
+    hostname: node1
+    ports:
+      - "2221:22"
+    networks:
+      - ansible-net
+
+  node2:
+    build:
+      context: ./node2
+      dockerfile: Dockerfile
+    image: ansible-node2:latest
+    container_name: node2
+    hostname: node2
+    ports:
+      - "2222:22"
+    networks:
+      - ansible-net
+
+  ansible-server:
+    build:
+      context: ./ansible-server
+      dockerfile: Dockerfile
+    image: ansible-server:latest
+    container_name: ansible-server
+    hostname: ansible-server
+    ports:
+      - "2220:22"
+    depends_on:
+      - node1
+      - node2
+    volumes:
+      - ./shared_folder:/etc/ansible
+    networks:
+      - ansible-net
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+networks:
+  ansible-net:
+    name: ansible-net
+    driver: bridge

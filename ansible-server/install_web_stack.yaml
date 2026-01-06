@@ -1,0 +1,74 @@
+---
+- name: Install Web Stack
+  hosts: webservers-nodes
+  gather_facts: false
+  become: yes
+  become_method: su
+
+  tasks:
+    - name: Update APT & Install Tools
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+        name:
+          - procps
+          - net-tools
+        state: present
+
+    - name: Install Apache2 and PHP and MySQL
+      apt:
+        name:
+          - apache2
+          - php
+          - libapache2-mod-php
+          - mysql-server
+          - php-mysql
+        state: present
+
+    - name: Configure Apache2 to listen on port 8081
+      lineinfile:
+        path: /etc/apache2/ports.conf
+        regexp: '^Listen '
+        line: 'Listen 8081'
+        backup: yes
+
+    - name: Update Apache2 default site to use port 8081
+      lineinfile:
+        path: /etc/apache2/sites-available/000-default.conf
+        regexp: '<VirtualHost \*:80>'
+        line: '<VirtualHost *:8081>'
+        backup: yes
+      notify: restart apache2
+
+    - name: Create info.php
+      copy:
+        content: "<?php phpinfo(); ?>"
+        dest: /var/www/html/info.php
+
+    - name: Start and enable MySQL
+      service:
+        name: mysql
+        state: started
+        enabled: yes
+
+    - name: Start and enable Apache2
+      service:
+        name: apache2
+        state: started
+        enabled: yes
+
+    - name: Verify Apache2 is listening on port 8081
+      shell: netstat -tlnp 2>/dev/null | grep -q ":8081.*apache2" || ss -tlnp 2>/dev/null | grep -q ":8081.*apache2"
+      register: apache_port_check
+      changed_when: false
+      failed_when: false
+
+    - name: Display Apache2 port status
+      debug:
+        msg: "Apache2 is {{ 'listening on port 8081' if apache_port_check.rc == 0 else 'NOT listening on port 8081 - check configuration' }}"
+
+  handlers:
+    - name: restart apache2
+      service:
+        name: apache2
+        state: restarted
