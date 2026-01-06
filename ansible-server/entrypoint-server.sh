@@ -31,14 +31,10 @@ ssh-keyscan -H node1 >> ~/.ssh/known_hosts 2>/dev/null
 echo "===  known_hosts de ansible-server ==="
 cat ~/.ssh/known_hosts
 
-echo "=== Copying SSH key to node1 (with auto-accept and password) ==="
-sshpass -p '1234' ssh-copy-id -o StrictHostKeyChecking=no -i /root/.ssh/id_ed25519.pub root@node1 || echo "Failed to copy key to node1"
-
+echo "=== Adding node2 to known_hosts ===" 
 
 echo "=== Adding node2 to known_hosts ===" 
 ssh-keyscan -H node2 >> ~/.ssh/known_hosts 2>/dev/null 
-echo "=== Copying SSH key to node2 (with auto-accept and password) ==="
-sshpass -p '1234' ssh-copy-id -o StrictHostKeyChecking=no -i /root/.ssh/id_ed25519.pub root@node2 || echo "Failed to copy key to node2"
 
 
 
